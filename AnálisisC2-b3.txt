@@ -1,32 +1,31 @@
- 	.text
-  	.align	2
-  
-  	.globl	main
-  	.ent	main
-Ir  I1mr ILmr Dr  D1mr DLmr Dw  D1mw DLmw   
+Ir  I1mr ILmr Dr  D1mr DLmr Dw  D1mw DLmw
+  .    .    .   .    .    .   .    .    . 	.text
+  .    .    .   .    .    .   .    .    . 	.align	2
+  .    .    .   .    .    .   .    .    .  	.globl	main
+  .    .    .   .    .    .   .    .    .  	.ent	main
   .    .    .   .    .    .   .    .    .  main:
   .    .    .   .    .    .   .    .    .  	.set	noreorder
-  3    1    1   0    0    0   0    0    0  	.cpload	t9		-> .cpload se extande en 3 instrucciones. Cuando se busca la primera instruccion(no se encuentra en la cache) y se produce un MISS.Entonces se guarda en la cache de instrucciones el bolque de 16 bytes(4 instr.) que la contiene. Como las instrucciones se guardan consecutivas en memoria, las 2 instrucciones siguientes de .cpload se encuentran en el mismo bloque que la primera instruccion guardada(ya que cada bloque tiene 16 bytes).Por ende cuando se buscan en cache ambas resultan en HIT.->se guardan en el indice n%4.
+  3    1    1   0    0    0   0    0    0  	.cpload	t9		-> .cpload se expande en 3 instrucciones. Cuando se busca la primera instruccion(no se encuentra en la cache) se produce un MISS.Entonces se guarda en la cache de instrucciones el bolque de 16 bytes(4 instr.) que la contiene. Como las instrucciones se guardan consecutivas en memoria, las 2 instrucciones siguientes de .cpload se encuentran en el mismo bloque que la primera instruccion guardada(ya que cada bloque tiene 16 bytes).Por ende cuando se buscan en cache ambas resultan en HIT.->se guardan en el indice n%4.
   .    .    .   .    .    .   .    .    .  	.set	nomacro
   1    0    0   0    0    0   0    0    0  	addiu	sp, sp, -24	-> Como esta instruccion fue guardada en el bloque cargado previamente en la cache, resulta en un HIT.
   1    1    1   0    0    0   1    1    1  	sw	fp, 20(sp)	-> Se busca esta instrucción en su respectiva caché, lo cual resulta en MISS. Por lo cual, se carga en la caché de instrucciones ésta al igual que sus siguientes 3 instrucciones.->se guardan en el indice (n+1)%4. Por otro lado, en la caché de datos no se encuentra la dirección correspondiente a 20(sp), produciéndose un MISS. De esta manera, se carga en la caché el bloque de 16 bytes que contiene dicha dirección.-> se guarda en el indice n%4.
   1    0    0   0    0    0   0    0    0  	move	fp, sp		-> Como esta instruccion fue guardada en el bloque cargado previamente en la cache, resulta en un HIT.
   1    0    0   0    0    0   1    1    1  	.cprestore	0	-> Esta directiva se interpreta como la siguiente instrucción 'sw	gp,0(sp)'. La cual ya se encuentra cargada en caché, por lo tanto es un HIT. Por otra parte, la dirección correspondiente a 0(sp) no se encuentra en la caché de datos, resultando en un MISS. Así, se carga en la caché el bloque de 16 bytes que contiene dicha dirección se guarda en el indice (n+1)%4.
   .    .    .   .    .    .   .    .    .  
-  2    1    1   1    1    1   0    0    0  	la	t0, aligned0
-  2    0    0   1    0    0   0    0    0  	la	t1, aligned1
-  2    1    1   1    0    0   0    0    0  	la	t2, aligned2
+  2    1    1   1    1    1   0    0    0  	la	t0, aligned0	-> Esta instruccion se expande en dos instrucciones. Cuando se busca la primera instruccion esta instruccion fue guardada en el bloque cargado previamente en la cache, resulta en un HIT. Cuando se busca la segunda instruccion no se encuentra en la cache y se produce un MISS. Entonces se guarda en la cache de instrucciones el bolque de 16 bytes(4 instr.) que la contiene. Por ende cuando se buscan en cache ambas resultan en HIT.->se guardan en el indice n%4. Por otro lado, en la caché de datos no se encuentra la dirección correspondiente a aligned0, produciéndose un MISS. De esta manera, se carga en la caché el bloque de 16 bytes que contiene dicha dirección.-> se guarda en el indice n%4. 
+  2    0    0   1    0    0   0    0    0  	la	t1, aligned1	-> Esta instruccion se expande en dos instrucciones. Como ambas instrucciones fue guardada en el bloque cargado previamente en la cache, resulta en HIT. Por otro lado, en la caché de datos se encuentra la dirección correspondiente a aligned1, produciéndose un HIT.
+  2    1    1   1    0    0   0    0    0  	la	t2, aligned2	-> Esta instruccion se expande en dos instrucciones. Como la primera instruccion fue guardada en el bloque cargado previamente en la cache, resulta en un HIT. Se busca la segunda instrucción en su respectiva caché, lo cual resulta en MISS. Por lo cual, se carga en la caché de instrucciones ésta al igual que sus siguientes 3 instrucciones.->se guardan en el indice (n+1)%4. Por otro lado, en la caché de datos se encuentra la dirección correspondiente a aligned2, produciéndose un HIT.
   1    0    0   0    0    0   0    0    0  	li	t3, 256		-> Como esta instruccion fue guardada en el bloque cargado previamente en la cache, resulta en un HIT.
 
-256    0    0 256  256  256   0    0    0  loop:lw	t4, 0(t0)
-256    0    0 256  256  256   0    0    0  	lw	t5, 0(t1)
-256    1    1   0    0    0   0    0    0  	addu	t6, t5, t4
-256    0    0   0    0    0 256  256  256  	sw	t6, 0(t2)
-256    0    0   0    0    0   0    0    0  	addu	t0, t0, 4
-256    0    0   0    0    0   0    0    0  	addu	t1, t1, 4
-256    1    1   0    0    0   0    0    0  	addu	t2, t2, 4
-256    0    0   0    0    0   0    0    0  	subu	t3, t3, 1
-256    0    0   0    0    0   0    0    0  	bnez	t3, loop
+256    0    0 256  256  256   0    0    0  loop:lw	t4, 0(t0)	??
+256    0    0 256  256  256   0    0    0  	lw	t5, 0(t1)	??
+256    1    1   0    0    0   0    0    0  	addu	t6, t5, t4	-> Se busca esta instrucción en su respectiva caché, lo cual resulta en MISS. Por lo cual, se carga en la caché de instrucciones ésta al igual que sus siguientes 3 instrucciones.->se guardan en el indice (n+1)%4.
+256    0    0   0    0    0 256  256  256  	sw	t6, 0(t2)	??
+256    0    0   0    0    0   0    0    0  	addu	t0, t0, 4	-> Como esta instruccion fue guardada en el bloque cargado previamente en la cache, resulta en un HIT.
+256    0    0   0    0    0   0    0    0  	addu	t1, t1, 4	-> Como esta instruccion fue guardada en el bloque cargado previamente en la cache, resulta en un HIT.
+256    1    1   0    0    0   0    0    0  	addu	t2, t2, 4	-> Se busca esta instrucción en su respectiva caché, lo cual resulta en MISS. Por lo cual, se carga en la caché de instrucciones ésta al igual que sus siguientes 3 instrucciones.->se guardan en el indice (n+1)%4.
+256    0    0   0    0    0   0    0    0  	subu	t3, t3, 1	-> Como esta instruccion fue guardada en el bloque cargado previamente en la cache, resulta en un HIT.
+256    0    0   0    0    0   0    0    0  	bnez	t3, loop	-> Como esta instruccion fue guardada en el bloque cargado previamente en la cache, resulta en un HIT.	
   .    .    .   .    .    .   .    .    .  
   .    .    .   .    .    .   .    .    .  	# Destruimos el stack frame antes de retornar de main().
   .    .    .   .    .    .   .    .    .  	#
@@ -34,7 +33,7 @@ Ir  I1mr ILmr Dr  D1mr DLmr Dw  D1mw DLmw
   1    1    1   1    1    1   0    0    0  	lw	fp, 20(sp)	-> Se busca esta instrucción en su respectiva caché, lo cual resulta en MISS. Por lo cual, se carga en la caché de instrucciones ésta al igual que sus siguientes 3 instrucciones.->se guardan en el indice ??. Por otro lado, en la caché de datos no se encuentra la dirección correspondiente a 20(sp), produciéndose un MISS. De esta manera, se carga en la caché el bloque de 16 bytes que contiene dicha dirección.-> se guarda en el indice ??.
   1    0    0   0    0    0   0    0    0  	addiu	sp, sp, 24	-> Como esta instruccion fue guardada en el bloque cargado previamente en la cache, resulta en un HIT.
   .    .    .   .    .    .   .    .    .  
-  .    .    .   .    .    .   .    .    .  	# Para volver al sistema operativo cargamos un c�digo de retorno nulo.
+  .    .    .   .    .    .   .    .    .  	# Para volver al sistema operativo cargamos un codigo de retorno nulo.
   .    .    .   .    .    .   .    .    .  	#
   1    0    0   0    0    0   0    0    0  	move	v0, zero	-> Como esta instruccion fue guardada en el bloque cargado previamente en la cache, resulta en un HIT.
   1    0    0   0    0    0   0    0    0  	jr	ra		-> Como esta instruccion fue guardada en el bloque cargado previamente en la cache, resulta en un HIT.
