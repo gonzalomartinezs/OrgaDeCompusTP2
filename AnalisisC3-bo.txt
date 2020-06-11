@@ -1,0 +1,54 @@
+Aclaracion, el cache esta compuesto por 4 lineas en un formato 4 Way. Por lo tanto, todas comparten el mismo indice pero en 4 distintos conjuntos (ABCD).
+
+
+Ir  I1mr ILmr Dr  D1mr DLmr Dw D1mw DLmw 
+
+  .    .    .   .    .    .  .    .    .  
+  .    .    .   .    .    .  .    .    .  	.text
+  .    .    .   .    .    .  .    .    .  	.align	2     -> El alling 2 ya me esta dando el dato que en la direccion de mi primera instruccion los ultimos 2 bits van a ser 0.
+  .    .    .   .    .    .  .    .    .  
+  .    .    .   .    .    .  .    .    .  	.globl	main
+  .    .    .   .    .    .  .    .    .  	.ent	main -> Hasta este punto son todas directivas de prepreprocesador, tiene sentido que no se acceda a memoria.
+  .    .    .   .    .    .  .    .    .  main:
+  .    .    .   .    .    .  .    .    .  	.set	noreorder
+  3    1    1   0    0    0  0    0    0  	.cpload	t9  ->El cpload se expande en 3 instrucciones. Esto explica el 3 en la linea de IR, mientras que el miss en la lectura de instrucciones tiene 									sentido ya que es la primera vez que se usa el cache. Es un miss obligatorio. (Debido a la estructura actual se trae un bloque de 	
+																	       4 palabras de memoria a cache).
+						Otra observacion a recalcar es que se traen 3 instrucciones a cache, pero se produce un solo miss. Esto se puede interpretar como que cpload se encuentra 							alineado con el bloque.
+  .    .    .   .    .    .  .    .    .  	.set	nomacro   ->directiva, no existe en tiempo de ejecucion.
+  1    0    0   0    0    0  0    0    0  	addiu	sp, sp, -24   -> tiene sentido que no haya ningun miss, ya se cargo todo el bloque con la instruccion anterior.
+  1    1    1   0    0    0  1    1    1  	sw	fp, 20(sp)    -> Vuelve a aparecer un miss, esto es porque esta nueva instruccion se encuentra a 4 palabras que la primera.
+									 Por lo tanto es obligatorio que se traiga otro bloque de memoria. Lo llamamos B.(El primer cargado fue A)
+									 Respecto a la parte de data, se realiza una escritura y dicho bloque no esta en memoria. Se produce un miss
+									 Y se trae el mismo a memoria.	
+  1    0    0   0    0    0  0    0    0  	move	fp, sp          -> Lo mismo, no hay miss porque el bloque ya esta cargado.
+  1    0    0   0    0    0  1    1    1  	.cprestore	0       -> Hay Escritura de datos.La intruccion es un Hit en cache de instrucciones, pero se produce un miss en
+									 la de datos.(Se carga el bloque en cache) (Va al conjunto B de datos ) . 
+  .    .    .   .    .    .  .    .    .  
+  1    0    0   1    1    1  0    0    0  	la	t0, aligned      ->Hit en el cache de instrucciones (ultima instruccion del bloque B). Miss en cache de datos, Se carga el bloque
+									 (En este caso en el conjunto C de datos).
+  .    .    .   .    .    .  .    .    .  	.align	20              -> Pre procesador. (se setean los ultimos 20 bits en 0)
+  1    1    1   0    0    0  0    0    0  	li	t1, 100         -> Miss en cache de instrucciones, se carga un nuevo bloque (lo llamamos C).
+100    0    0 100    1    1  0    0    0  loop:	lw	t2, 1024(t0)    -> Dicha instruccion ya se encuentra cargada en el cache de instrucciones. Se produce un hit.
+									   Respecto al cache de datos, la direccion 1024 no se encuentra cargada. Por lo tanto se produce un miss
+									  obligatorio. Pero las 99 veces restantes si se encuentra, ya que el bloque fue traido a cache(Conjunto C de datos).
+100    0    0   0    0    0  0    0    0  	subu	t1, t1, 1      -> La instruccion ya se encuentra cargada. (Se trajo un bloque hace 2 palabras).
+100    0    0   0    0    0  0    0    0  	bnez	t1, loop       -> Idem anterior.
+  .    .    .   .    .    .  .    .    .  
+  .    .    .   .    .    .  .    .    .  	# Destruimos el stack frame antes de retornar de main().
+  .    .    .   .    .    .  .    .    .  	#
+100    1    1   0    0    0  0    0    0  	move	sp, fp  -> No se encuentra en el cache de instrucciones, se cargo un nuevo bloque (en el ultimo conjunto, el D)
+  1    0    0   1    0    0  0    0    0  	lw	fp, 20(sp) -> ya se encuentra cargada la instruccion, y tambien el dato porque ya fue cargado en un SW anterior. Hit en ambos cache.
+  1    0    0   0    0    0  0    0    0  	addiu	sp, sp, 24 -> La instruccion ya se encuentra cargada. Hit
+  .    .    .   .    .    .  .    .    .  
+  .    .    .   .    .    .  .    .    .  	# Para volver al sistema operativo cargamos un c�digo de retorno nulo.
+  .    .    .   .    .    .  .    .    .  	#
+  1    0    0   0    0    0  0    0    0  	move	v0, zero -> idem.
+  1    1    1   0    0    0  0    0    0  	jr	ra -> No se encuentra la instruccion, por lo tanto es un miss. Se carga la instruccion reemplazando un bloque ya cargado.
+							      (Este va a ser el conjunto A, ya que el resto fue usado recientemente). CHECKEAR.
+  .    .    .   .    .    .  .    .    .  	.end	main
+  .    .    .   .    .    .  .    .    .  
+  .    .    .   .    .    .  .    .    .  	.rdata
+  .    .    .   .    .    .  .    .    .  	.align	20
+  .    .    .   .    .    .  .    .    .  aligned:
+  .    .    .   .    .    .  .    .    .  	.skip	8192
+
