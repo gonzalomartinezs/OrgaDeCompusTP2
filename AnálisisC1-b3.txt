@@ -1,0 +1,74 @@
+# benchmark-b3.S - Trabajo Práctico 2
+# Organización de Computadoras 66.20/85.37
+# Facultad de Ingeniería, Universidad de Buenos Aires.
+#
+# $Date: 2020/05/26 02:04:47 $
+
+#include <regdef.h>
+#include <sys/asm.h>
+#include <sys/syscall.h>
+
+	.text
+	.align	2
+
+	.globl	main
+	.ent	main
+
+
+	sw	fp, 20(sp)	-> CI: Se busca esta instrucción en su respectiva caché, lo cual 						resulta en MISS. Por lo cual, se carga en la caché de 						instrucciones ésta y las siguientes 3 instrucciones. (El 						index es (n+1)%4).
+				   CD: Por otro lado, en la caché de datos no se encuentra la 						dirección correspondiente a 20(sp), produciéndose un MISS. De 						esta manera, se carga en caché el bloque de 16 bytes que 						contiene dicha dirección (el index es 2 o 3, más adelante se 						puede observar el motivo).  
+
+	move	fp, sp		-> CI: Se encuentra en el mismo bloque de caché que la instrucción 						anterior, razón por la cual es un HIT.
+
+	.cprestore	0	-> CI: Esta directiva se interpreta como la siguiente instrucción 						'sw     gp,0(sp)', la cual también se encuentra en el segundo 						bloque cargado en caché. Es un HIT. 
+				   CD: Por otra parte, la dirección correspondiente a 0(sp) no se 						encuentra en la caché de datos, resultando en un MISS. Así, 						se carga en la caché el bloque de 16 bytes que contiene dicha 						dirección (el index es (n+1)%4).
+
+	la	t0, aligned	-> CI: En ese caso, esta instrucción se expande en dos (lw y addiu), 						siendo la primera un HIT en la caché de instrucciones, por 						ser la última instrucción del último bloque cargado, y la 						segunda, un MISS. Entonces se carga el bloque de memoria que 						contiene a esta instrucción y las próximas 3  en el índice 						(n+2)%4 de su respectiva caché.
+				   CD: Por otra parte, la búsqueda de la dirección de 'aligned' 					resulta en un MISS de la caché de datos, pues no se 						encontraba cargada en la misma. Por ende, se procede a cargar 						el bloque que contiene dicha dirección, la cual posee una 						particularidad: la etiqueta 'aligned' se encuentra debajo de 						la directiva '.align 20', por lo tanto la dirección de 						memoria está alineada a 2^20 bytes, lo cual significa que los 						bits correspondientes a índice y offset son 00 y 0000, 						respectivamente. Es por esto que el bloque de memoria que la 						contiene se guarda en el índice 0 de la caché de datos.
+
+	la	t1, aligned1	-> CI: Este caso en muy similar al anterior con la diferencia de que 						ambas instrucciones se hallan en esta caché, por ende 						se producen 2 HITS.
+				-> CD: Como las etiquetas se almacenan contiguas en memoria, ésta se 						encuentra en el último bloque cargado en la caché de datos, 						resultando en un HIT.
+
+	la	t2, aligned2	-> CI: Similar al primer 'la', la instrucción 'lw' se halla en la 						caché mientras que el 'addiu' no, siendo un HIT y un MISS. Es 						por esto que se carga el bloque de memoria que contiene a 						esta instrucción y las próximas 3 en en el índice (n+2)%4 de 						su respectiva caché.
+				-> CD: Análogo al caso anterior.
+
+	li	t3, 256		-> CI: Esta instrucción se encuentra cargada en su respectiva caché, 						por lo cual es un HIT.
+
+loop:	lw	t4, 0(t0)	-> CI: Como esta instrucción se encuentra dentro de la caché es un 						HIT. Además, el hecho de que este índice de la caché de 					instrucciones no se vea modificado a lo largo de las 						iteraciones, provoca que las 256 veces que se accede a esta 						instrucción sean HITS.
+				-> CD: 
+
+	lw	t5, 0(t1)	-> CI: Análogo al caso anterior, se producen 256 HITS.
+				-> CD:
+
+	addu	t6, t5, t4	-> CI: En este caso, la instrucción no se halla cargada en la caché, 						por lo cual se produce un MISS y se carga el bloque de 						memoria que contiene a esta instrucción y las próximas 3 en 						el índice (n+3)%4 de esta caché.
+	sw	t6, 0(t2)	-> CI: Como esta instrucción se encuentra dentro de la caché es un 						HIT. Además, el hecho de que este índice de la caché de 					instrucciones no se vea modificado a lo largo de las 						iteraciones, provoca que las 256 veces que se accede a esta 						instrucción sean HITS.
+				-> CD: 
+	addu	t0, t0, 4	-> CI: Análogo al caso anterior, se producen 256 HITS.
+	addu	t1, t1, 4	-> CI: Análogo al caso anterior, se producen 256 HITS.
+	addu	t2, t2, 4	-> CI: En este caso, la instrucción no se halla cargada en la caché, 						por lo cual se produce un MISS y se carga el bloque de 						memoria que contiene a esta instrucción y las próximas 3 en 						el índice (n+4)%4 de esta caché.
+	subu	t3, t3, 1	-> CI: Como esta instrucción se encuentra dentro de la caché es un 						HIT. Además, el hecho de que este índice de la caché de 					instrucciones no se vea modificado a lo largo de las 						iteraciones, provoca que las 256 veces que se accede a esta 						instrucción sean HITS.
+	bnez	t3, loop	-> CI: Análogo al caso anterior, se producen 256 HITS.
+
+	# Destruimos el stack frame antes de retornar de main().
+	#
+	move	sp, fp		-> CI: Esta instrucción se encuantra en los últimos 4 bytes del último 						bloque cargado en la caché de instrucciones, 						por ende es un HIT. Debido al 'brach delay 						slot' esta instrucción por más que se encuentre fuera del 						loop, se ejecuta la misma cantidad de veces como iteraciones 						del mismo. Como el bloque de caché que la contiene no se vé 						modificado todas las 256 lecturas acaban siendo HITs.
+
+	lw	fp, 20(sp)	-> CI: No se encuentra esta instrucción en la caché de instrucciones, 						por ende es un MISS. Se carga el bloque de 16 bytes que la 						contiene en la caché (el index es (n+5)%4).
+				-> CD: El bloque que contenía al dato asociado a la dirección 20(sp) 						fue sobreescrito en la caché dentro del loop en la caché, 						produciéndose un MISS de lectura. En consecuencia, se carga en 						la caché el bloque de 16 bytes que contiene dicha dirección.
+
+	addiu	sp, sp, 24	-> CI: Se encuentra en el mismo bloque de caché que la instrucción 						anterior, razón por la cual es un HIT.
+
+	# Para volver al sistema operativo cargamos un código de retorno nulo.
+	#
+	move	v0, zero	-> CI: Análogo al anterior.
+	jr	ra		-> CI: Análogo al anterior.
+	.end	main
+
+	.data
+	.align	20
+aligned0:
+	.skip	8192
+aligned1:
+	.skip	8192
+aligned2:
+	.skip	8192

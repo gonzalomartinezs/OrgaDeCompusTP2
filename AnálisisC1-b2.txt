@@ -1,0 +1,61 @@
+# benchmark-b2.S - Trabajo Práctico 2
+# Organización de Computadoras 66.20/85.37
+# Facultad de Ingeniería, Universidad de Buenos Aires.
+#
+# $Date: 2020/05/26 02:05:15 $
+
+#include <regdef.h>
+#include <sys/asm.h>
+#include <sys/syscall.h>
+
+	.text
+	.align	2
+
+	.globl	main
+	.ent	main
+main:
+	.set	noreorder
+	.cpload	t9		-> CI: .cpload se expande en 3 instrucciones. Cuando se busca la 						primera ocurre un MISS, entonces se guarda en la caché de 						instrucciones el bloque de 16 bytes (4 instr.) que la 						contiene. Si se observa con atención, tanto dichas 3 						instrucciones como la siguiente se traducen en 4 búsquedas en 						caché y un sólo MISS. Esto indica que la dirección de la 						primer instrucción del '.cpload' presenta como offset el 						valor 0000, es decir, es la primer instrucción dentro del 						bloque levantado. Debido a que las instrucciones se guardan 						contiguas en memoria, este bloque contiene las próximas 2 						instrucciones de .cpload, por ende cuando el CPU procede a 						buscarlas en caché resultan ambas en HIT (el índice de este 						bloque en caché es desconocido, pero se puede definir de la 						siguiente manera: n%4).
+	.set	nomacro
+	addiu	sp, sp, -24	-> CI: Puesto que esta instrucción también se encontraba en el bloque 						cargado previamente en la caché, resulta en un HIT. 
+
+	sw	fp, 20(sp)	-> CI: Se busca esta instrucción en su respectiva caché, lo cual 						resulta en MISS. Por lo cual, se carga en la caché de 						instrucciones ésta y las siguientes 3 instrucciones. (el 						index es (n+1)%4).
+				   CD: Por otro lado, en la caché de datos no se encuentra la 						dirección correspondiente a 20(sp), produciéndose un MISS. De 						esta manera, se carga en caché el bloque de 16 bytes que 						contiene dicha dirección (el index es 2 o 3, más adelante se 						puede observar el motivo).  
+
+	move	fp, sp		-> CI: Se encuentra en el mismo bloque de caché que la instrucción 						anterior, razón por la cual es un HIT.
+
+	.cprestore	0	-> CI: Esta directiva se interpreta como la siguiente instrucción 						'sw     gp,0(sp)', la cual también se encuentra en el segundo 						bloque cargado en caché. Es un HIT. 
+				   CD: Por otra parte, la dirección correspondiente a 0(sp) no se 						encuentra en la caché de datos, resultando en un MISS. Así, 						se carga en la caché el bloque de 16 bytes que contiene dicha 						dirección (el index es (n+1)%4).
+
+	la	t0, aligned	-> CI: En ese caso, esta instrucción se expande en dos (lw y addiu), 						siendo la primera un HIT en la caché de instrucciones, por 						ser la última instrucción del último bloque cargado, y la 						segunda, un MISS. Entonces se carga el bloque de memoria que 						la contiene en su respectiva caché con la salvedad de que, 						este caso particular, este sólo contiene otra instrucción más 						(el motivo de esto se puede observar en la línea X).
+				   CD: Por otra parte, la búsqueda de la dirección de 'aligned' 					resulta en un MISS de la caché de datos, pues no se 						encontraba cargada en la misma. Por ende, se procede a cargar 						el bloque que contiene dicha dirección, la cual posee una 						particularidad: la etiqueta 'aligned' se encuentra debajo de 						la directiva '.align 20', por lo tanto la dirección de 						memoria está alineada a 2^20 bytes, lo cual significa que los 						bits correspondientes a índice y offset son 00 y 0000, 						respectivamente. Es por esto que el bloque de memoria que la 						contiene se guarda en el índice 0 de la caché de datos.
+
+	li	t1, 100		-> CI: Esta instrucción se encuentra cargada en su respectiva caché, 						por lo cual es un HIT.
+	.align	20
+loop:	lw	t2, 0(t0)	-> CI: Como consecuencia de la directiva '.align 20' esta instrucción 						se encuentra alineada a 2^20 bytes. Como se explicó 						anteriormente, el offset e índice de la misma son 0s. De esta 						manera, cuando se busca dicha instrucción en el índice 0 de 						la caché resulta en MISS y, por ende, se carga en este el 						bloque de instrucciones en el que se halla la misma. Como a 						lo largo del loop no se modifica dicho índice de la caché el 						resto de las 99 iteraciones resultan en HITS.
+				   CD: En una primer iteración, cuando se busca la dirección  						contenida por el registro t0 sumada al offset en esta caché 			?			deviene en un MISS, NO SÉ POR QUÉ????. Por ende se carga en 						caché el bloque de 16 bytes que la contiene, siendo esta 			?			dirección la de offset 0000 (TAMPOCO SÉ POR QUÉ).
+ 					Luego, dentro del loop, se incrementa en 16 bytes el valor de 						la dirección de t0, lo cual resulta en un MISS puesto que las 						direcciones cargadas dentro del bloque donde se almanceno la 						dirección de la primer iteración se pueden entender como 						original, original+4, original+8, original+12. Así, se 						levanta de memoria el nuevo bloque que contiene a la 						dirección deseada y se carga en la caché. Este proceso se 						repite a lo largo de 100 iteraciones resultando en 100 MISSES.
+
+	addu	t0, t0, 16	-> CI: Esta instrucción se encuentra cargada en esta caché en el 						índice 0, puesto que se encuentra en el mismo bloque que la 						instrucción anterior pero con offset = 0100. Las 100 lecturas 						en caché devienen en 100 HITS.
+	subu	t1, t1, 1	-> CI: Similar al caso anterior esta instrucción ya se encontraba en 						caché. También son 100 HITS.
+	bnez	t1, loop	-> CI: Análogo al caso anterior.
+
+	# Destruimos el stack frame antes de retornar de main().
+	#
+	move	sp, fp		-> CI: No se encuentra esta instrucción en la caché de instrucciones, 						por ende es un MISS. Se carga el bloque de 16 bytes que la 						contiene en la caché (el index es 1). Debido al 'brach delay 						slot' esta instrucción por más que se encuentre fuera del 						loop, se ejecuta la misma cantidad de veces como iteraciones 						del mismo. Al ya estar presente en la caché, las siguientes 						99 lecturas acaban siendo HITs.
+
+	lw	fp, 20(sp)	-> CI: Se encuentra en el mismo bloque de caché que la instrucción 						anterior, razón por la cual es un HIT. 
+				-> CD: El dato asociado a la dirección 20(sp) fue cargado previamente 						en la caché (línea x), produciéndose un HIT de lectura. 
+
+	addiu	sp, sp, 24	-> CI: Se encuentra en el mismo bloque de caché que la instrucción 						anterior, razón por la cual es un HIT.
+
+	# Para volver al sistema operativo cargamos un código de retorno nulo.
+	#
+	move	v0, zero	-> CI: Análogo al anterior.
+	jr	ra		-> CI: No se encuentra esta instrucción en la caché de instrucciones, 						por ende es un MISS. Se carga el bloque de 16 bytes que la 						contiene en la caché (el index es 2).
+	.end	main
+
+	.rdata
+	.align	20
+aligned:
+	.skip	8192
