@@ -1,0 +1,63 @@
+Ir  I1mr ILmr Dr  D1mr DLmr Dw  D1mw DLmw 
+
+-- line 10 ----------------------------------------
+  .    .    .   .    .    .   .    .    .  
+  .    .    .   .    .    .   .    .    .  	.text
+  .    .    .   .    .    .   .    .    .  	.align	2
+  .    .    .   .    .    .   .    .    .  
+  .    .    .   .    .    .   .    .    .  	.globl	main
+  .    .    .   .    .    .   .    .    .  	.ent	main                         
+  .    .    .   .    .    .   .    .    .  main:
+  .    .    .   .    .    .   .    .    .  	.set	noreorder  
+								 -> A partir de aca comienzan las instrucciones.
+  3    1    1   0    0    0   0    0    0  	.cpload	t9       -> Se compone por 3 instrucciones, la primera hace miss y provoca que se traiga a cache un bloque de 4 instrucciones.
+								    Las 2 segundas instrucciones hacen hit.(Llamaremos a este primer bloque conjunto A)
+  .    .    .   .    .    .   .    .    .  	.set	nomacro   -> Directiva de preprocesador.
+  1    0    0   0    0    0   0    0    0  	addiu	sp, sp, -24  -> Solo se accede a cache de instrucciones, Se genera un hit debido a que el bloque fue previamente cargado(Completando el conjunto A).
+  1    1    1   0    0    0   1    1    1  	sw	fp, 20(sp)   -> Se genera un miss en el cache de instrucciones debido a que se debe traer un bloque nuevo(Lo llamamos conjunto B).
+									Se genera un miss en el cache de datos ya que se tiene que ir a buscar a memoria el contenido de 20(sp). Este miss es obligatorio.
+  1    0    0   0    0    0   0    0    0  	move	fp, sp       -> Se genera un hit en instrucciones. Se guarda en el segundo lugar del conjunto B.
+  1    0    0   0    0    0   1    1    1  	.cprestore	0    -> En terminos de instruccion es un hit y ocupa el tercer lugar del conjunto B. En memoria es un miss ya que
+									el contenido de sp debe ser recolectado de la memoria de datos. 
+  .    .    .   .    .    .   .    .    .  
+  2    1    1   1    1    1   0    0    0  	la	t0, aligned0  -> Se interpreta como dos instrucciones. La primera completa el conjunto  B y la segunda genera un miss, trayendo un nuevo
+									bloque de memoria a cache, el cual llamaremos conjunto C. En datos se genera un miss, ya que se carga la direccion de memoria
+									del label : Aligned 0.
+  2    0    0   1    0    0   0    0    0  	la	t1, aligned1 -> Se interpreta como dos instrucciones. Ocupan los lugares 2 y 3 del conjunto C.
+									.En datos se genera un hit, ya que se carga la direccion de memoria de algined 1, Que esta declarado continuo de algined 0
+									 Por lo tanto ese bloque ya se encuentra en cache.
+  2    1    1   1    0    0   0    0    0  	la	t2, aligned2  -> Se interpreta como dos instrucciones. La primera completa el conjunto C y la segunda genera un miss, trayendo un nuevo
+									bloque de memoria a cache, el cual llamaremos conjunto D. En datos es analogo al punto anterior, aligned 2 se encuentra en
+									el mismo bloque de datos.
+  1    0    0   0    0    0   0    0    0  	li	t3, 256
+
+256    0    0 256   64   64   0    0    0  loop:	lw	t4, 0(t0)
+256    0    0 256   64   64   0    0    0  	lw	t5, 0(t1)
+256    1    1   0    0    0   0    0    0  	addu	t6, t5, t4
+256    0    0   0    0    0 256   64   64  	sw	t6, 0(t2)
+256    0    0   0    0    0   0    0    0  	addu	t0, t0, 4
+256    0    0   0    0    0   0    0    0  	addu	t1, t1, 4
+256    1    1   0    0    0   0    0    0  	addu	t2, t2, 4
+256    0    0   0    0    0   0    0    0  	subu	t3, t3, 1
+256    0    0   0    0    0   0    0    0  	bnez	t3, loop
+  .    .    .   .    .    .   .    .    .  
+
+  .    .    .   .    .    .   .    .    .  	# Destruimos el stack frame antes de retornar de main().
+  .    .    .   .    .    .   .    .    .  	#
+256    0    0   0    0    0   0    0    0  	move	sp, fp
+  1    1    1   1    1    1   0    0    0  	lw	fp, 20(sp)
+  1    0    0   0    0    0   0    0    0  	addiu	sp, sp, 24
+  .    .    .   .    .    .   .    .    .  
+  .    .    .   .    .    .   .    .    .  	# Para volver al sistema operativo cargamos un c�digo de retorno nulo.
+  .    .    .   .    .    .   .    .    .  	#
+  1    0    0   0    0    0   0    0    0  	move	v0, zero
+  1    0    0   0    0    0   0    0    0  	jr	ra
+  .    .    .   .    .    .   .    .    .  	.end	main
+  .    .    .   .    .    .   .    .    .  
+  .    .    .   .    .    .   .    .    .  	.data
+  .    .    .   .    .    .   .    .    .  	.align	20
+  .    .    .   .    .    .   .    .    .  aligned0:
+  .    .    .   .    .    .   .    .    .  	.skip	8192
+  .    .    .   .    .    .   .    .    .  aligned1:
+  .    .    .   .    .    .   .    .    .  	.skip	8192
+-- line 56 ----------------------------------------
