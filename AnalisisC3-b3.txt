@@ -31,27 +31,32 @@ Ir  I1mr ILmr Dr  D1mr DLmr Dw  D1mw DLmw
 									el mismo bloque de datos.
   1    0    0   0    0    0   0    0    0  	li	t3, 256
 
-256    0    0 256   64   64   0    0    0  loop:	lw	t4, 0(t0)
-256    0    0 256   64   64   0    0    0  	lw	t5, 0(t1)
-256    1    1   0    0    0   0    0    0  	addu	t6, t5, t4
-256    0    0   0    0    0 256   64   64  	sw	t6, 0(t2)
-256    0    0   0    0    0   0    0    0  	addu	t0, t0, 4
-256    0    0   0    0    0   0    0    0  	addu	t1, t1, 4
-256    1    1   0    0    0   0    0    0  	addu	t2, t2, 4
-256    0    0   0    0    0   0    0    0  	subu	t3, t3, 1
-256    0    0   0    0    0   0    0    0  	bnez	t3, loop
+256    0    0 256   64   64   0    0    0  loop:	lw	t4, 0(t0)  -> Este analisis del bloque puede ser complicado, En el informe se explicara con mas detalle.
+									      La primera vez que se accede a memoria se trae el bloque t0(aligned 0), y se produce un miss. Luego dentro del bucle
+								      	      Se agrega 4 a la direccion que contiene t0. Esto genera que cada 4 iteraciones, se necesite buscar un bloque nuevo 
+									      (4x4 = 16). Por lo tanto en 256 iteraciones tenemos 64 miss (256/4 = 64). Esto se explica con mas detalle en el informe.
+256    0    0 256   64   64   0    0    0  	lw	t5, 0(t1)  -> Misma explicacion que punto anterior.
+256    1    1   0    0    0   0    0    0  	addu	t6, t5, t4 -> Se genera un miss en cache de instrucciones debido a que es la cuarta despues del ultimo miss.
+256    0    0   0    0    0 256   64   64  	sw	t6, 0(t2)  -> Misma explicacion que antes(se profundiza en el informe).
+256    0    0   0    0    0   0    0    0  	addu	t0, t0, 4   -> Se genera un hit en cache de instrucciones debido a que ya se cargo el bloque.
+256    0    0   0    0    0   0    0    0  	addu	t1, t1, 4  -> Identico.
+256    1    1   0    0    0   0    0    0  	addu	t2, t2, 4  -> Se genera un miss en cache de instrucciones ya que esta se encuentra en un bloque nuevo.
+256    0    0   0    0    0   0    0    0  	subu	t3, t3, 1  -> se genera un hit, ya que se cargo el bloque arriba.
+256    0    0   0    0    0   0    0    0  	bnez	t3, loop   -> identico.
   .    .    .   .    .    .   .    .    .  
 
   .    .    .   .    .    .   .    .    .  	# Destruimos el stack frame antes de retornar de main().
   .    .    .   .    .    .   .    .    .  	#
-256    0    0   0    0    0   0    0    0  	move	sp, fp
-  1    1    1   1    1    1   0    0    0  	lw	fp, 20(sp)
-  1    0    0   0    0    0   0    0    0  	addiu	sp, sp, 24
+256    0    0   0    0    0   0    0    0  	move	sp, fp   -> identico.
+  1    1    1   1    1    1   0    0    0  	lw	fp, 20(sp) -> En cuanto al cache de instrucciones, se genera un miss por razones ya ampliamente explicadas y se debe traer un bloque
+								      nuevo a memoria. En el lado de los datos se produce un miss de escritura  Y se trae ese bloque a memoria. El miss ocurre porque	
+									a pesar de que el bloque que contiene a 20(sp) ya fue puesto en cache previamente. Este mismo fue desechado durante el loop. 
+  1    0    0   0    0    0   0    0    0  	addiu	sp, sp, 24  -> Se genera hit porque arriba se cargo el bloque de instrucciones.
   .    .    .   .    .    .   .    .    .  
   .    .    .   .    .    .   .    .    .  	# Para volver al sistema operativo cargamos un c�digo de retorno nulo.
   .    .    .   .    .    .   .    .    .  	#
-  1    0    0   0    0    0   0    0    0  	move	v0, zero
-  1    0    0   0    0    0   0    0    0  	jr	ra
+  1    0    0   0    0    0   0    0    0  	move	v0, zero -> Trivial, ya explicado.
+  1    0    0   0    0    0   0    0    0  	jr	ra    ->idem
   .    .    .   .    .    .   .    .    .  	.end	main
   .    .    .   .    .    .   .    .    .  
   .    .    .   .    .    .   .    .    .  	.data
