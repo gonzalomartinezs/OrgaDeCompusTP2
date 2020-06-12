@@ -1,0 +1,51 @@
+
+Ir  I1mr ILmr Dr  D1mr DLmr Dw D1mw DLmw 
+
+-- line 10 ----------------------------------------
+  .    .    .   .    .    .  .    .    .  
+  .    .    .   .    .    .  .    .    .  	.text
+  .    .    .   .    .    .  .    .    .  	.align	2
+  .    .    .   .    .    .  .    .    .  
+  .    .    .   .    .    .  .    .    .  	.globl	main
+  .    .    .   .    .    .  .    .    .  	.ent	main
+  .    .    .   .    .    .  .    .    .  main:
+  .    .    .   .    .    .  .    .    .  	.set	noreorder  -> Aca terminan las directivas. 
+  3    1    1   0    0    0  0    0    0  	.cpload	t9         -> Como ya se viene explicando esta se separa en 3. Es un miss obligatorio.
+ .    .    .   .    .    .  .    .    .  	.set	nomacro    
+  1    0    0   0    0    0  0    0    0  	addiu	sp, sp, -24 -> Hit, ya que el bloque de 4 palabras fue cargado en la operacion previa.
+  1    1    1   0    0    0  1    1    1  	sw	fp, 20(sp)  -> Miss, ya que es la cuarta instruccion. Tambien hace un write, donde tiene un miss obligatorio.
+  1    0    0   0    0    0  0    0    0  	move	fp, sp      -> Hit, el bloque de 4 instrucciones ya fue cargado en la operacion anterior.
+  1    0    0   0    0    0  1    1    1  	.cprestore	0   -> Genera un miss en memoria ya que se esta cargando un nuevo bloque.
+  .    .    .   .    .    .  .    .    .    
+  2    1    1   1    1    1  0    0    0  	la	t0, aligned ->Se separa en 2 instrucciones. La primera entra en el bloque previamente cargado, pero la segunda 
+								      produce un miss ya que debe traer un bloque de memoria.
+								      Por el lado de datos, genera un miss ya que se trae la direccion de memoria de aligned. Este es un miss obligatorio.
+  1    0    0   0    0    0  0    0    0  	li	t1, 100      -> Hit en cache de instrucciones. Esto es porque al isntruccion previa cargo el bloque en memoria.
+  .    .    .   .    .    .  .    .    .  	.align	20           -> Fijo los ultimos 20 bits en 0.
+100    1    1 100  100  100  0    0    0  loop:	lw	t2, 0(t0)    -> Cargo el contenido de la direccion que contiene to en t2.
+									Hay miss en cache de instrucciones debido a que es la primer instruccion posterior al align.
+									Hay 100 miss en cache de datos debido a que siempre se accede a un dato en un bloque diferente,
+									Esto es debido a que dentro del bucle en cada iteracion se corre la direccion de memoria en 16 bytes.
+									Este desplazamiento obliga a que en cada iteracion se tenga que importar un bloque diferente.
+100    0    0   0    0    0  0    0    0  	addu	t0, t0, 16   -> Linea donde se hace el +16 que genera el problema.
+100    0    0   0    0    0  0    0    0  	subu	t1, t1, 1    -> Resto uno al contador. Es esperable que haya hits en instrucciones ya que el bloque fue cargado recientemente.
+100    0    0   0    0    0  0    0    0  	bnez	t1, loop     -> Condicion del loop. Idem arriba
+  .    .    .   .    .    .  .    .    .  
+  .    .    .   .    .    .  .    .    .  	# Destruimos el stack frame antes de retornar de main().
+  .    .    .   .    .    .  .    .    .  	#
+100    1    1   0    0    0  0    0    0  	move	sp, fp -> En esta instruccion se produce un miss ya hay una diferencia de 4 instrucciones con el ultimo.
+									
+  1    0    0   1    1    1  0    0    0  	lw	fp, 20(sp) -> El bloque de instrucciones ya se encuentra cargado, por lo tanto es un hit.En el area de datos es un miss
+								      debido a que en el bucle ya se sobrescribio todo el cache de datos.
+  1    0    0   0    0    0  0    0    0  	addiu	sp, sp, 24  -> Hit en instrucciones, por lo mismmo que el punto anterior.
+  .    .    .   .    .    .  .    .    .  
+  .    .    .   .    .    .  .    .    .  	# Para volver al sistema operativo cargamos un c�digo de retorno nulo.
+  .    .    .   .    .    .  .    .    .  	#
+  1    0    0   0    0    0  0    0    0  	move	v0, zero -> Hit en instrucciones, por lo mismmo que el punto anterior.
+  1    1    1   0    0    0  0    0    0  	jr	ra       -> Miss en instrucciones. Esto es debido a que es la cuarta desde el ultimo hit. (explicado en los analisis de los benchmarks previos)
+  .    .    .   .    .    .  .    .    .  	.end	main
+  .    .    .   .    .    .  .    .    .  
+  .    .    .   .    .    .  .    .    .  	.rdata
+  .    .    .   .    .    .  .    .    .  	.align	20
+  .    .    .   .    .    .  .    .    .  aligned:
+  .    .    .   .    .    .  .    .    .  	.skip	8192
