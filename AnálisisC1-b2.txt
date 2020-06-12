@@ -45,7 +45,7 @@ loop:	lw	t2, 0(t0)	-> CI: Como consecuencia de la directiva '.align 20' esta ins
 	move	sp, fp		-> CI: No se encuentra esta instrucción en la caché de instrucciones, 						por ende es un MISS. Se carga el bloque de 16 bytes que la 						contiene en la caché (el index es 1). Debido al 'brach delay 						slot' esta instrucción por más que se encuentre fuera del 						loop, se ejecuta la misma cantidad de veces como iteraciones 						del mismo. Al ya estar presente en la caché, las siguientes 						99 lecturas acaban siendo HITs.
 
 	lw	fp, 20(sp)	-> CI: Se encuentra en el mismo bloque de caché que la instrucción 						anterior, razón por la cual es un HIT. 
-				-> CD: El dato asociado a la dirección 20(sp) fue cargado previamente 						en la caché (línea x), produciéndose un HIT de lectura. 
+				-> CD: El bloque que contiene al dato asociado a la dirección 20(sp), 						si bien fue cargado previamente en la caché (línea x), fue 						sobreescrito durante el loop, produciéndose un MISS de 						lectura. 
 
 	addiu	sp, sp, 24	-> CI: Se encuentra en el mismo bloque de caché que la instrucción 						anterior, razón por la cual es un HIT.
 
