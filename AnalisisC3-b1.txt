@@ -1,0 +1,49 @@
+Ir  I1mr ILmr Dr  D1mr DLmr Dw D1mw DLmw 
+
+-- line 10 ----------------------------------------
+  .    .    .   .    .    .  .    .    .  
+  .    .    .   .    .    .  .    .    .  	.text
+  .    .    .   .    .    .  .    .    .  	.align	2
+  .    .    .   .    .    .  .    .    .  
+  .    .    .   .    .    .  .    .    .  	.globl	main
+  .    .    .   .    .    .  .    .    .  	.ent	main   
+  .    .    .   .    .    .  .    .    .  main:
+  .    .    .   .    .    .  .    .    .  	.set	noreorder     -> Hasta aca fueron todas directivas. No se ejecuta nada en tiempo de ejecucion.
+  3    1    1   0    0    0  0    0    0  	.cpload	t9             ->Como explicamos en anteriores, se desglosa en 3. Se produce el primer miss( Se carga el bloque en memoria, lo llamamos conjunto A).
+									Al haber un solo miss, se interpreta que el bloque y la direccion estan alineados.
+  .    .    .   .    .    .  .    .    .  	.set	nomacro
+  1    0    0   0    0    0  0    0    0  	addiu	sp, sp, -24    -> Se produce un hit, dicho bloque de 4 palabras ya se encuentra cargado.
+  1    1    1   0    0    0  1    1    1  	sw	fp, 20(sp)     -> Se produce un miss de instruccion, Se carga el mismo en cache( Lo llamamos conjunto B)
+  1    0    0   0    0    0  0    0    0  	move	fp, sp         -> Se produce un hit de instruccion, ya que el bloque se cargo en la instruccion anterior.
+  1    0    0   0    0    0  1    1    1  	.cprestore	0       -> hit en instruccion, por las razones ya aclaradas.
+  .    .    .   .    .    .  .    .    .  
+  2    1    1   1    1    1  0    0    0  	la	t0, aligned    -> Se expande en 2, solo la segunda hace miss. Tambien tiene que hacer un read por la direccion de memoria de 
+									  Aligned, esto genera una lectura y un miss en el cache de datos.
+  1    0    0   0    0    0  0    0    0  	li	t1, 100
+  .    .    .   .    .    .  .    .    .  	.align	20            -> Genera todos ceros en las primeras 20 posiciones.
+100    1    1 100   25   25  0    0    0  loop:	lw	t2, 0(t0)     -> Tenemos un miss en instruccion, esto tiene sentido por el aligned previo. En el cache de datos
+									 se busca una nueva direccion por primera vez. Luego en el loop se avanzan 4 posiciones, lo que equivale a una palabra.
+									 Y como cada Bloque tiene 4 palabras, cada 4 iteraciones tengo que volver a importar una palabra nueva.
+									 Por lo tanto cada 4 palabras se debera cargar un bloque nuevo. (100/4) = 25.
+									   
+100    0    0   0    0    0  0    0    0  	addu	t0, t0, 4     -> Le agrego a t0 4.
+100    0    0   0    0    0  0    0    0  	subu	t1, t1, 1     -> Le resto 1 al iterador. 
+100    0    0   0    0    0  0    0    0  	bnez	t1, loop      -> Tanto en esta como en las 3 instrucciones previas se tiene el bloque ya cargado en memoria.(Posterior al align).
+  .    .    .   .    .    .  .    .    .  
+  .    .    .   .    .    .  .    .    .  	# Destruimos el stack frame antes de retornar de main().
+  .    .    .   .    .    .  .    .    .  	#
+100    1    1   0    0    0  0    0    0  	move	sp, fp       -> Tengo un miss en el cache de intrucciones debido a que tengo que traer un bloque nuevo.
+  1    0    0   1    1    1  0    0    0  	lw	fp, 20(sp)   -> Miss en instrucciones, perfectamente esperado. Read y miss en cache de datos, tambien esperado ya que en el bucle sobreescribio
+									todo el cache.
+  1    0    0   0    0    0  0    0    0  	addiu	sp, sp, 24   -> Hit en cache ya que la instruccion estaba cargada.
+  .    .    .   .    .    .  .    .    .  
+  .    .    .   .    .    .  .    .    .  	# Para volver al sistema operativo cargamos un c�digo de retorno nulo.
+  .    .    .   .    .    .  .    .    .  	#
+  1    0    0   0    0    0  0    0    0  	move	v0, zero -> Idem anterior.
+  1    1    1   0    0    0  0    0    0  	jr	ra       -> Es al cuarta instruccion desde el ultimo miss, es esperable que no se encuentre en memoria.
+  .    .    .   .    .    .  .    .    .  	.end	main
+  .    .    .   .    .    .  .    .    .  
+  .    .    .   .    .    .  .    .    .  	.rdata
+  .    .    .   .    .    .  .    .    .  	.align	20
+  .    .    .   .    .    .  .    .    .  aligned:
+  .    .    .   .    .    .  .    .    .  	.skip	8192
